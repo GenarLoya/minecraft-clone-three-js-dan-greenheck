@@ -25,14 +25,16 @@ export class World extends THREE.Group {
     },
   };
 
-  constructor(size = { width: 32, height: 32 }) {
+  constructor(size = { width: 64, height: 32 }) {
     super();
     this.size = size;
   }
 
   generate() {
+    const rng = new RNG(this.params.seed);
     this.inititlizeTerrain();
-    this.generateTerrain();
+    this.generateResources(rng);
+    // this.generateTerrain(rng);
     this.generateMeshes();
   }
 
@@ -54,38 +56,51 @@ export class World extends THREE.Group {
     }
   }
 
-  generateTerrain() {
-    const rng = new RNG(this.params.seed);
+  generateTerrain(rng) {
     const noiseGenerator = new SimplexNoise(rng);
     for (let x = 0; x < this.size.width; x++) {
       for (let z = 0; z < this.size.width; z++) {
-        // Compute noise value at this x-z location
         const value = noiseGenerator.noise(
           x / this.params.terrain.scale,
           z / this.params.terrain.scale
         );
 
-        // Scale noise based on the magnitude and add in the offset
         const scaledNoise =
           this.params.terrain.offset + this.params.terrain.magnitude * value;
 
-        // Compute final height of terrain at this location
         let height = this.size.height * scaledNoise;
 
-        // Clamp between 0 and max height
         height = Math.max(
           0,
           Math.min(Math.floor(height), this.size.height - 1)
         );
 
-        // Starting at the terrain height, fill in all the blocks below that height
         for (let y = 0; y < this.size.height; y++) {
-          if (y === height) {
+          if (y === height && this.getBlock(x, y, z)?.id === BLOCKS.AIR.id) {
             this.setBlockId(x, y, z, BLOCKS.GRASS.id);
           } else if (y <= height) {
             this.setBlockId(x, y, z, BLOCKS.DIRT.id);
           } else {
             this.setBlockId(x, y, z, BLOCKS.AIR.id);
+          }
+        }
+      }
+    }
+  }
+
+  generateResources(rng) {
+    const simplex = new SimplexNoise(rng);
+    for (let x = 0; x < this.size.width; x++) {
+      for (let y = 0; y < this.size.height; y++) {
+        for (let z = 0; z < this.size.width; z++) {
+          const value = simplex.noise3d(
+            x / BLOCKS.STONE.scale.x,
+            y / BLOCKS.STONE.scale.y,
+            z / BLOCKS.STONE.scale.z
+          );
+
+          if (value > BLOCKS.STONE.scarcity) {
+            this.setBlockId(x, y, z, BLOCKS.STONE.id);
           }
         }
       }
